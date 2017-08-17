@@ -34,7 +34,7 @@ public class ServiceCamelRoute extends RouteBuilder {
 	String EMPLYEE_TIME;
 	@Value("${activemq.url}")
 	String ACTIVEMQ_URL;
-	ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(ACTIVEMQ_URL);
+	
 
 	/**
 	 * 
@@ -44,15 +44,17 @@ public class ServiceCamelRoute extends RouteBuilder {
 		
 		CamelContext camelContext = getContext();
 		
-		//camelContext.addComponent("activemq", ActiveMQComponent.activeMQComponent(ACTIVEMQ_URL));
-		camelContext.addComponent("activemq", jmsComponentAutoAcknowledge(connectionFactory));
+		//ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(ACTIVEMQ_URL);
+		
+		camelContext.addComponent("activemq", ActiveMQComponent.activeMQComponent(ACTIVEMQ_URL));
+		//camelContext.addComponent("activemq", jmsComponentAutoAcknowledge(connectionFactory));
 
 		onException(Exception.class).handled(false).end();
 
 		restConfiguration().component("jetty").host(host).port(port)
 				.bindingMode(RestBindingMode.json);
 
-		rest("/employee").post("/{id}")
+		rest("/proxy").post("/{serviceId}")
 		  //.outType(EmployeeDetails.class)
 			.to("direct:getDetail");
 
@@ -61,22 +63,30 @@ public class ServiceCamelRoute extends RouteBuilder {
 
 			@Override
 			public void process(Exchange exchange) throws Exception {
-				//String empId = (String) exchange.getIn().getHeader("id");
+				//String serviceId = (String) exchange.getIn().getHeader("serviceId");
 				StringBuilder sb = new StringBuilder(EMPLYEE_SERVICE);
 				//sb.append(empId);
-				//sb.append("?bridgeEndpoint=true");
+				sb.append("?bridgeEndpoint=true");
 				URI uri = new URI(sb.toString());
 				exchange.setProperty("employeeURI", uri);
 			}
-		}).removeHeaders("*").process(exchange -> {
-			exchange.getIn().setBody(null);
-		}).setHeader(Exchange.HTTP_METHOD, constant("GET"))
-				.toD("${property.employeeURI}").to("direct:result");
+		})
+		//Calling the respective web service
+		.choice()
+		        .when(header("serviceId").contains("US") )
+		        	.log(LoggingLevel.INFO, "-------------It's US-----------")
+		        	.removeHeaders("*").process(exchange -> {
+		        	exchange.getIn().setBody(null);
+		        	}).setHeader(Exchange.HTTP_METHOD, constant("GET"))
+		        	.toD("${property.employeeURI}").to("direct:result");
+
 
 		from("direct:result")
 				.streamCaching()
 				.log(LoggingLevel.INFO, "${body}")
 				
+				
+				///This part is required to pass the response to another webservice
 				/*.process(
 						exchange -> {
 							String jsonResponse = exchange.getIn().getBody(
@@ -96,6 +106,7 @@ public class ServiceCamelRoute extends RouteBuilder {
 				.setHeader(Exchange.HTTP_METHOD, constant("POST"))
 				.to(EMPLYEE_TIME+"?bridgeEndpoint=true")*/
 				
+				//Sending the webservice response to the queue
 				.to("activemq:queue:TEST.GOEP?disableReplyTo=true")
 				.transform().constant("Status:Success");			
 	}
@@ -104,11 +115,11 @@ public class ServiceCamelRoute extends RouteBuilder {
 	 * 
 	 * @param connectionFactory
 	 * @return
-	 */
+	 *//*
 	public static JmsComponent jmsComponentAutoAcknowledge(ConnectionFactory connectionFactory) {
 		        JmsConfiguration template = new JmsConfiguration(connectionFactory);
 		        template.setAcknowledgementMode(Session.AUTO_ACKNOWLEDGE);
 		        return new JmsComponent(template);
-		    }
+		    }*/
 
 }
