@@ -51,8 +51,9 @@ public class ServiceCamelRoute extends RouteBuilder {
 
 		onException(Exception.class).handled(false).end();
 
-		restConfiguration().component("jetty").host(host).port(port)
-				.bindingMode(RestBindingMode.json);
+		restConfiguration().component("restlet")
+		.host("localhost").port("8080")
+				.bindingMode(RestBindingMode.auto);
 
 		rest("/proxy").post("/{serviceId}")
 		  //.outType(EmployeeDetails.class)
@@ -82,10 +83,9 @@ public class ServiceCamelRoute extends RouteBuilder {
 
 
 		from("direct:result")
-				.streamCaching()
+				//.streamCaching()
 				.log(LoggingLevel.INFO, "${body}")
-				
-				
+							
 				///This part is required to pass the response to another webservice
 				/*.process(
 						exchange -> {
