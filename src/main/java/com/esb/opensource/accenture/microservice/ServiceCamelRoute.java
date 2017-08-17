@@ -52,7 +52,7 @@ public class ServiceCamelRoute extends RouteBuilder {
 		onException(Exception.class).handled(false).end();
 
 		restConfiguration().component("restlet")
-		.host("localhost").port("8080")
+		//.host("localhost").port("8080")
 				.bindingMode(RestBindingMode.auto);
 
 		rest("/proxy").post("/{serviceId}")
